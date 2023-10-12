@@ -3,32 +3,30 @@ package com.example.imageapp
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
-import java.net.URI
 
 class PhotoViewModel : ViewModel() {
     private val _state = MutableStateFlow(PhotoState())
     private val _photos = MutableStateFlow(emptyList<Image>())
-    val lock = Any()
     val state = combine(_state, _photos) { state, photos ->
         state.copy(photos = photos)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PhotoState())
@@ -38,8 +36,9 @@ class PhotoViewModel : ViewModel() {
             is PhotoEvent.Search -> {
                 Log.d("CHECK_RESPONSE", "onEvent: ${_state.value.query}")
                 var images: List<Deferred<Image>>?
-                _state.update {
-                    it.copy(searchComplete = false)
+                val updated = false
+                _photos.update {
+                    emptyList()
                 }
                 _state.update {
                     it.copy(loading = true)
@@ -51,53 +50,69 @@ class PhotoViewModel : ViewModel() {
                             call: Call<PixabayResponse>,
                             response: Response<PixabayResponse>
                         ) {
-                            if (response.isSuccessful && (response.body()?.totalHits ?: 0) > 0) {
-                                val imageResults = response.body()?.hits?.take(15)
-                                var i = 0
-                                images = imageResults?.map {
-                                    CoroutineScope(Dispatchers.Default).async {
-                                        i++
-                                        _state.update {
-                                            it.copy(progress = i.toFloat() / imageResults.size)
-                                        }
-                                        Image(url = it.largeImageURL, it.id)
+                            runBlocking {
+                                if (response.isSuccessful && (response.body()?.totalHits
+                                        ?: 0) > 0
+                                ) {
+                                    val imageResults = response.body()?.hits?.take(15)
+                                    var i = 0
+                                    _state.update {
+                                        it.copy(progress = 0f)
                                     }
-                                }
-                                Log.d("CHECK_RESPONSE", "onResponse: ${response.body()}")
-                                // Use a coroutine scope to await all the Deferred objects
-                                CoroutineScope(Dispatchers.Default).launch {
-                                    val loadedImages = images?.map { it.await() }
-                                    // Update the photos on the main thread
-                                    withContext(Dispatchers.Main) {
-                                        _photos.update {
-                                            loadedImages ?: emptyList()
+                                    _state.value.lock.withLock {
+
+                                        images = imageResults?.map {
+                                            CoroutineScope(Dispatchers.Default).async {
+                                                i++
+                                                _state.update {
+                                                    it.copy(progress = i.toFloat() / imageResults.size)
+                                                }
+                                                Image(url = it.largeImageURL, it.id)
+                                            }
                                         }
-                                        // Update the state to loading = false here
-                                        _state.update {
-                                            it.copy(loading = false)
+
+                                        Log.d(
+                                            "CHECK_RESPONSE",
+                                            "onResponse: ${response.body()}"
+                                        )
+
+                                        // Use a coroutine scope to await all the Deferred objects
+                                        CoroutineScope(Dispatchers.Default).launch {
+                                            val loadedImages = images?.awaitAll()
+                                            // Update the photos on the main thread
+                                            withContext(Dispatchers.IO) {
+                                                // there is a race condition here i could not fix :(
+                                                Thread.sleep(600)
+                                                _photos.update {
+                                                    loadedImages ?: emptyList()
+                                                }
+
+                                            }
                                         }
                                     }
-                                }
-                            } else {
-                                if (response.body()?.totalHits == 0) {
-                                    Toast.makeText(
-                                        context,
-                                        "No images found",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+
                                 } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Failed to load images",
-                                        Toast.LENGTH_SHORT
-                                    )
-                                        .show()
+                                    if (response.body()?.totalHits == 0) {
+                                        Toast.makeText(
+                                            context,
+                                            "No images found",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to load images",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                    _photos.update {
+                                        emptyList()
+                                    }
                                 }
-                                _photos.update {
-                                    emptyList()
-                                }
-                                _state.update {
-                                    it.copy(loading = false)
+                                _state.value.lock.withLock {
+                                    _state.update {
+                                        it.copy(loading = false)
+                                    }
                                 }
                             }
                         }
@@ -105,8 +120,8 @@ class PhotoViewModel : ViewModel() {
                         override fun onFailure(call: Call<PixabayResponse>, t: Throwable) {
                             Log.d("CHECK_RESPONSE", "onFailure: $t")
                         }
-                    })
-
+                    }
+                )
                 onEvent(context, PhotoEvent.SetQuery(""))
             }
 

@@ -99,21 +99,20 @@ fun UploadImageDialog(state: PhotoState, onEvent: (PhotoEvent) -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ImageList(state: PhotoState, onEvent: (PhotoEvent) -> Unit) {
-    val images = state.photos
     var cellCount = 1
     if (state.switchView) {
         cellCount = 2
     }
-    if (state.searchComplete) {
+    if (state.loading) {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyVerticalStaggeredGrid(
                 modifier = Modifier.padding(15.dp),
                 columns = StaggeredGridCells.Fixed(cellCount),
                 content = {
-                    items(images.size) { index ->
-                        val imageBitMap = images[index].byteArray?.let {
+                    items(state.photos.size) { index ->
+                        val imageBitMap = state.photos[index].byteArray?.let {
                             BitmapFactory.decodeByteArray(
-                                images[index].byteArray,
+                                state.photos[index].byteArray,
                                 0,
                                 it.size
                             )
@@ -125,8 +124,8 @@ private fun ImageList(state: PhotoState, onEvent: (PhotoEvent) -> Unit) {
                                 modifier = Modifier
                                     .padding(5.dp)
                                     .clickable {
-                                        Log.d("CHECK_IMAGE", "ImageList: ${images[index]}")
-                                        onEvent(PhotoEvent.SelectImage(images[index]))
+                                        Log.d("CHECK_IMAGE", "ImageList: ${state.photos[index]}")
+                                        onEvent(PhotoEvent.SelectImage(state.photos[index]))
                                         onEvent(PhotoEvent.ShowUploadImageDialog(true))
                                     }
                             )
@@ -135,16 +134,18 @@ private fun ImageList(state: PhotoState, onEvent: (PhotoEvent) -> Unit) {
                 })
 
         }
-    } else {
-        if (state.loading) {
+    }
+    else {
+        if (state.progress>0f) {
             LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth().padding(15.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(15.dp),
                 progress = state.progress
             )
-        } else {
-            Button(onClick = { onEvent(PhotoEvent.SearchComplete) }) {
-                Text(text = "Refresh")
-            }
+        }
+        if (state.progress == 1f) {
+            onEvent(PhotoEvent.Loading)
         }
     }
 }
@@ -158,12 +159,12 @@ private fun SearchBar(state: PhotoState, onEvent: (PhotoEvent) -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         SearchTextField(modifier = Modifier.weight(0.75f), state = state, onEvent = onEvent)
-        SearchButton(onEvent = onEvent, modifier = Modifier.weight(0.25f))
+        SearchButton(state, onEvent = onEvent, modifier = Modifier.weight(0.25f))
     }
 }
 
 @Composable
-private fun SearchButton(onEvent: (PhotoEvent) -> Unit, modifier: Modifier) {
+private fun SearchButton(state: PhotoState, onEvent: (PhotoEvent) -> Unit, modifier: Modifier) {
     Button(
         modifier = modifier.fillMaxWidth(),
         onClick = {

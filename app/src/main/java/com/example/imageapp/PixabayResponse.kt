@@ -7,7 +7,9 @@ data class PixabayResponse(
 )
 
 data class ImageResult(
+    val id: Int,
     val largeImageURL: String,
+    val webformatURL: String,
     val webformatHeight: Int,
     val webformatWidth: Int,
 )

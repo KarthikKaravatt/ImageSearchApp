@@ -6,9 +6,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.imageapp.ui.theme.ImageAppTheme
+import com.google.firebase.storage.FirebaseStorage
 
 @Suppress("UNCHECKED_CAST")
 class MainActivity : ComponentActivity() {
@@ -25,14 +27,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val context = LocalContext.current
             ImageAppTheme {
                 val state by viewModel.state.collectAsState()
                 SearchScreen(state = state, onEvent = {
-                    viewModel.onEvent(it)
+                    viewModel.onEvent(context,it)
                 })
 
             }
         }
     }
-
 }

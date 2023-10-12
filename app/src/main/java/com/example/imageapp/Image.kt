@@ -10,7 +10,7 @@ import kotlin.io.readBytes
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-class Image(private val url: String) {
+class Image(val url: String, val id: Int) {
     var byteArray: ByteArray? = null
 
     init {

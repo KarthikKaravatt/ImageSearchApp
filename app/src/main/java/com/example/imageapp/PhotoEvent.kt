@@ -8,6 +8,7 @@ sealed interface PhotoEvent {
     object UpdatePhotos : PhotoEvent
     object UploadImage : PhotoEvent
     object Loading : PhotoEvent
+    data class UploadProgress(val progress: Float) : PhotoEvent
     data class SelectImage(val image: Image) : PhotoEvent
     data class ShowUploadImageDialog(val boolean: Boolean) : PhotoEvent
 }

@@ -5,7 +5,8 @@ data class PhotoState(
     val query: String = "",
     val switchView: Boolean = false,
     val searchComplete: Boolean = true,
-    val loading: Boolean = false,
+    val loading: Boolean = true,
     val selectedImage: Image? = null,
     val showUploadImageDialog: Boolean = false,
+    val progress: Float = 0f,
 )

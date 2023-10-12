@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -136,15 +137,18 @@ private fun ImageList(state: PhotoState, onEvent: (PhotoEvent) -> Unit) {
         }
     } else {
         if (state.loading) {
-            Text(text = "Loading...")
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().padding(15.dp),
+                progress = state.progress
+            )
         } else {
             Button(onClick = { onEvent(PhotoEvent.SearchComplete) }) {
                 Text(text = "Refresh")
-
             }
         }
     }
 }
+
 
 @Composable
 private fun SearchBar(state: PhotoState, onEvent: (PhotoEvent) -> Unit) {
